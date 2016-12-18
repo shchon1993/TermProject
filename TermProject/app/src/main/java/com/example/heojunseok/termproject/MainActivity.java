@@ -33,6 +33,8 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -63,6 +65,9 @@ public class MainActivity extends Activity implements OnMapReadyCallback,
     LatLng currentPosition;
     Marker current_marker = null;
     List<Marker> previous_marker = null;
+
+    private FirebaseDatabase firebaseDatabase = FirebaseDatabase.getInstance();
+    private DatabaseReference databaseReference = firebaseDatabase.getReference();
 
     protected synchronized void buildGoogleApiClient() {
         mGoogleApiClient = new GoogleApiClient.Builder(this)
@@ -109,6 +114,30 @@ public class MainActivity extends Activity implements OnMapReadyCallback,
                 break;
         }
     }
+    public class GPSDATA{
+        public String username;
+        public double gpsdata;
+
+        public GPSDATA(){}
+
+        public GPSDATA(String username, double gpsdata){
+            this.username=username;
+            this.gpsdata=gpsdata;
+        }
+        public String getUsername(){
+            return username;
+        }
+        public void setUsername(String username){
+            this.username=username;
+        }
+        public double getGpsdata(){
+            return gpsdata;
+        }
+        public void  setGpsdata(double gpsdata){
+            this.gpsdata=gpsdata;
+        }
+    }
+    GPSDATA  data;
     protected  void onCreate(Bundle savedInstancState){
         super.onCreate(savedInstancState);
         setContentView(R.layout.activity_main);
@@ -123,7 +152,10 @@ public class MainActivity extends Activity implements OnMapReadyCallback,
         Button button = (Button)findViewById(R.id.Search);
         button.setOnClickListener(new View.OnClickListener(){
             public void onClick(View view){
-                googleMap.clear();
+
+            data = new GPSDATA(data.username, latitude);
+                databaseReference.child("latitude").push().setValue(data);
+                /* googleMap.clear();
 
                 if(previous_marker != null)
                     previous_marker.clear();
@@ -135,7 +167,7 @@ public class MainActivity extends Activity implements OnMapReadyCallback,
                         .radius(10000)
                         .type(PlaceType.POLICE)
                         .build()
-                        .execute();
+                        .execute();*/
             }
         });
     }
@@ -355,8 +387,8 @@ public class MainActivity extends Activity implements OnMapReadyCallback,
                     trace = false;
             }
         });
-        latitude = location.getLatitude();
-        longitude = location.getLongitude();
+        latitude = location.getLatitude();//위도
+        longitude = location.getLongitude();//경도
         if (trace == true) {
             Geocoder geocoder = new Geocoder(this, Locale.getDefault());
             List<Address> addresses = null;
@@ -420,4 +452,8 @@ public class MainActivity extends Activity implements OnMapReadyCallback,
     public void onPlacesFinished(){
         Log.i("PlacesAPI", "onPlacesFinished()");
     }
+
+
+
+
 }
