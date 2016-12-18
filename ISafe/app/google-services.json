@@ -1,0 +1,42 @@
+{
+  "project_info": {
+    "project_number": "329954845705",
+    "firebase_url": "https://isafe-a45d8.firebaseio.com",
+    "project_id": "isafe-a45d8",
+    "storage_bucket": "isafe-a45d8.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:329954845705:android:0ca7b100c404bf57",
+        "android_client_info": {
+          "package_name": "com.example.choihg.isafe"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "329954845705-7ndilnpcrh5u824kknq7r9cef3vuetvb.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAZzT0bh43JOzALX_GAXX_49u2B-JbbOkk"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 1,
+          "other_platform_oauth_client": []
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
