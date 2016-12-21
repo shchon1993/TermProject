@@ -13,26 +13,32 @@
         android:layout_height="wrap_content"
         android:layout_weight="0.8"
         class="com.google.android.gms.maps.MapFragment"/>
+
     <RelativeLayout
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content">
         <Button
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="위치 받기"
-            android:layout_weight="0.1"
+            android:text="주변 경찰서 보기"
+            android:layout_weight="0.4"
             android:id="@+id/Search"
             android:layout_alignParentTop="true"
             android:layout_alignParentLeft="true"
-            android:layout_alignParentStart="true"
-            android:width="205dp" />
+            android:layout_alignParentStart="true" />
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="위치 받기"
+            android:layout_weight="0.3"
+            android:layout_toRightOf="@id/Search"
+            android:id="@+id/Receive" />
         <Button
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="위치 보내기"
-            android:layout_weight="0.1"
-            android:layout_alignParentRight="true"
-            android:id="@+id/Trace"
-            android:width="205dp" />
+            android:layout_weight="0.3"
+            android:layout_toRightOf="@id/Receive"
+            android:id="@+id/Send" />
     </RelativeLayout>
 </LinearLayout>

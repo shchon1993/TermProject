@@ -34,14 +34,20 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.firebase.database.ChildEventListener;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import noman.googleplaces.NRPlaces;
 import noman.googleplaces.PlaceType;
@@ -69,6 +75,34 @@ public class MainActivity extends Activity implements OnMapReadyCallback,
 
     private FirebaseDatabase firebaseDatabase = FirebaseDatabase.getInstance();
     private DatabaseReference databaseReference = firebaseDatabase.getReference();
+
+    public static class PosData {
+        private double lat;
+        private double lon;
+
+        public PosData() { }
+
+        public PosData(double lat, double lon) {
+            this.lat = lat;
+            this.lon = lon;
+        }
+
+        public double getLat() {
+            return lat;
+        }
+
+        public void setLat(double lat) {
+            this.lat = lat;
+        }
+
+        public double getLon() {
+            return lon;
+        }
+
+        public void setLon(double lon) {
+            this.lon = lon;
+        }
+    }
 
     protected synchronized void buildGoogleApiClient() {
         mGoogleApiClient = new GoogleApiClient.Builder(this)
@@ -382,17 +416,44 @@ public class MainActivity extends Activity implements OnMapReadyCallback,
         markerOptions.title("현재위치");
         current_marker = googleMap.addMarker(markerOptions);
 
-        Button button2 = (Button)findViewById(R.id.Trace);
+        Button button2 = (Button)findViewById(R.id.Send);
+        Button button3 = (Button)findViewById(R.id.Receive);
 
-        latitude = location.getLatitude();
-        longitude = location.getLongitude();
+        //latitude = location.getLatitude();
+        //longitude = location.getLongitude();
 
         button2.setOnClickListener(new View.OnClickListener(){
             public void onClick(View view){
-                databaseReference.child("id").push().setValue("Parents");
-                databaseReference.child("latitude").push().setValue(latitude);
-                databaseReference.child("longitude").push().setValue(longitude);
-                Toast.makeText(getApplicationContext(), "위치를 전송하였습니다.", Toast.LENGTH_SHORT).show();
+                Map<String, Object> hopperUpdates = new HashMap<String, Object>();
+                hopperUpdates.put("position", new PosData(0, 0));
+                databaseReference.updateChildren(hopperUpdates);
+                hopperUpdates.put("position", new PosData(location.getLatitude(), location.getLongitude()));
+                databaseReference.updateChildren(hopperUpdates);
+                String st = Double.toString(location.getLatitude());
+                Toast.makeText(getApplicationContext(), "(" + st + ")위치를 전송하였습니다.", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        button3.setOnClickListener(new View.OnClickListener(){
+            public void onClick(View view){
+                databaseReference.child("position").addListenerForSingleValueEvent(
+                        new ValueEventListener() {
+                            @Override
+                            public void onDataChange(DataSnapshot dataSnapshot) {
+                                // Get user value
+                                PosData posData = dataSnapshot.getValue(PosData.class);  // chatData를 가져오고
+                                String st = Double.toString(posData.getLat());
+                                Toast.makeText(getApplicationContext(), "(" + st + ")위치를 받았습니다.", Toast.LENGTH_SHORT).show();
+
+                                // ...
+                            }
+
+                            @Override
+                            public void onCancelled(DatabaseError databaseError) {
+                                Log.w(TAG, "getUser:onCancelled", databaseError.toException());
+                                // ...
+                            }
+                        });
             }
         });
 
