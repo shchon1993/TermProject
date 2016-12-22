@@ -579,7 +579,7 @@ public class MainActivity extends Activity implements OnMapReadyCallback,
     public void onLocationChanged(final Location location){
         Log.i("zzzzzzzzzzzzzzzz", "onLocationChanged()");
         String errorMessage = "";
-        //currentPosition = new LatLng(location.getLatitude(), location.getLongitude());
+        currentPosition = new LatLng(location.getLatitude(), location.getLongitude());
 
         if (current_marker != null)
             current_marker.remove();
