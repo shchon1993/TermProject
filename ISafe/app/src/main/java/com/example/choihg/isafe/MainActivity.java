@@ -326,7 +326,7 @@ public class MainActivity extends Activity implements OnMapReadyCallback,
                     .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
                         @Override
                         public void onClick(DialogInterface dialog, int id) {
-                            if (et.getText().length() == 0)
+                            if (et.getText().length() == 0 || Integer.parseInt(et.getText().toString()) > 50000)
                                 Toast.makeText(getApplicationContext(), "값을 다시 입력해주세요.", Toast.LENGTH_SHORT).show();
                             else {
                                 radius = et.getText().toString();
@@ -348,7 +348,6 @@ public class MainActivity extends Activity implements OnMapReadyCallback,
         drawer.closeDrawer(GravityCompat.START);
         return true;
     }
-
     public boolean checkLocationPermission(){
         Log.d(TAG, "checkLocationPermission");
 
