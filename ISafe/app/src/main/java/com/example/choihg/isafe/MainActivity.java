@@ -3,22 +3,38 @@ package com.example.choihg.isafe;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.ClipData;
+import android.content.ComponentName;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
 import android.location.LocationManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.IBinder;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.support.design.widget.FloatingActionButton;
+import android.support.design.widget.NavigationView;
+import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.view.GravityCompat;
+import android.support.v4.widget.DrawerLayout;
+import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.app.AlertDialog;
+import android.support.v7.widget.Toolbar;
+import android.text.InputType;
 import android.util.Log;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
@@ -42,12 +58,15 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
 import java.io.IOException;
+import java.security.acl.Group;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import noman.googleplaces.NRPlaces;
 import noman.googleplaces.PlaceType;
@@ -56,7 +75,7 @@ import noman.googleplaces.PlacesListener;
 
 public class MainActivity extends Activity implements OnMapReadyCallback,
         GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener,
-        LocationListener, PlacesListener{
+        LocationListener, PlacesListener, NavigationView.OnNavigationItemSelectedListener{
     private  static final String TAG = "@@@";
     private GoogleApiClient mGoogleApiClient = null;
     private LocationRequest mLocationRequest;
@@ -71,10 +90,22 @@ public class MainActivity extends Activity implements OnMapReadyCallback,
     private GoogleMap googleMap;
     LatLng currentPosition;
     Marker current_marker = null;
+    Marker child_marker = null;
     List<Marker> previous_marker = null;
+    SafeService mService = new SafeService(); // 서비스 객체
+    boolean isSend = true;
+    boolean running = true;
+
+    boolean parent = false;
+    String radius = "10000";
+
+    int second = 10;
 
     private FirebaseDatabase firebaseDatabase = FirebaseDatabase.getInstance();
     private DatabaseReference databaseReference = firebaseDatabase.getReference();
+
+    Timer mTimer;
+    TimerTask mTimerTask = null;
 
     public static class PosData {
         private double lat;
@@ -112,7 +143,6 @@ public class MainActivity extends Activity implements OnMapReadyCallback,
                 .build();
         mGoogleApiClient.connect();
     }
-
 
     //GPS 활성화를 위한 대화상자
     private  void showGPSDisabledAlertToUser(){
@@ -152,12 +182,36 @@ public class MainActivity extends Activity implements OnMapReadyCallback,
                 }
                 break;
         }
+        if (requestCode == 1) { //메인이 요청한 코드가 1이고
+            if (resultCode == 1) { //결과코드가 1일 때 메모쓰기액티비티에서 온 삽입 코드이므로
+                String result = data.getStringExtra("parent"); //ListView에 파일 이름을 삽입한다.
+                if (result.equals("1")){
+                    parent = true;
+                }
+                else {
+                    parent = false;
+                }
+            }
+            else if (resultCode == 2) { //결과코드가 2일 때 메모읽기액티비티에서 온 삭제 코드이므로
+                radius = data.getStringExtra("radius"); //ListView에 파일 이름을 삭제한다.
+            }
+            else if (resultCode == 3) {
+                second = Integer.parseInt(data.getStringExtra("second"));
+            }
+        }
     }
 
 
     protected  void onCreate(Bundle savedInstancState){
         super.onCreate(savedInstancState);
         setContentView(R.layout.activity_main);
+
+        Log.i("zzzzzzzzzzzzzzzzzz", "onCreate()");
+
+        //bindService(new Intent(this, SafeService.class), mConnection, Context.BIND_AUTO_CREATE);
+        startService(new Intent(this, SafeService.class));
+
+        mTimer = new Timer();
 
         locationManager = (LocationManager)getSystemService(LOCATION_SERVICE);
 
@@ -166,26 +220,134 @@ public class MainActivity extends Activity implements OnMapReadyCallback,
 
         previous_marker = new ArrayList<Marker>();
 
-        Button button = (Button)findViewById(R.id.Search);
-        button.setOnClickListener(new View.OnClickListener(){
-            public void onClick(View view){
-                googleMap.clear();
+        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+        //setSupportActionBar(toolbar);
 
-                if(previous_marker != null)
-                    previous_marker.clear();
-
-                new NRPlaces.Builder()
-                        .listener(MainActivity.this)
-                        .key("AIzaSyDmWNCgElWM2VCRIZOPdUdam4TqiZE9QW8")
-                        .latlng(currentPosition.latitude, currentPosition.longitude)
-                        .radius(10000)
-                        .type(PlaceType.POLICE)
-                        .build()
-                        .execute();
+        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
+        fab.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
+                        .setAction("Action", null).show();
             }
         });
+
+        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
+        ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
+                this, drawer, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close);
+        drawer.setDrawerListener(toggle);
+        toggle.syncState();
+
+        NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
+        navigationView.setNavigationItemSelectedListener(this);
     }
 
+
+    public void onBackPressed() {
+        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
+        if (drawer.isDrawerOpen(GravityCompat.START)) {
+            drawer.closeDrawer(GravityCompat.START);
+        } else {
+            super.onBackPressed();
+        }
+    }
+
+
+    @SuppressWarnings("StatementWithEmptyBody")
+    @Override
+    public boolean onNavigationItemSelected(MenuItem item) {
+        // Handle navigation view item clicks here.
+        int id = item.getItemId();
+
+        if (id == R.id.nav_service) {
+            if(isSend == true) {
+                stopService(new Intent(this, SafeService.class));
+                isSend = false;
+            }
+            else {
+                startService(new Intent(this, SafeService.class));
+                isSend = true;
+            }
+        }
+        else if (id == R.id.nav_call) {
+            Intent intent = new Intent(Intent.ACTION_DIAL, Uri.parse("tel:"));
+            if(intent != null) {
+                if(intent.resolveActivity(getPackageManager()) != null) { startActivity(intent); }}
+        }
+        else if (id == R.id.nav_police) {
+            Toast.makeText(getApplicationContext(), "반경 "+radius+"m 내의 경찰서들을 검색합니다.", Toast.LENGTH_SHORT).show();
+            googleMap.clear();
+
+            if(previous_marker != null)
+                previous_marker.clear();
+
+            new NRPlaces.Builder()
+                    .listener(MainActivity.this)
+                    .key("AIzaSyDmWNCgElWM2VCRIZOPdUdam4TqiZE9QW8")
+                    .latlng(currentPosition.latitude, currentPosition.longitude)
+                    .radius(Integer.parseInt(radius))
+                    .type(PlaceType.POLICE)
+                    .build()
+                    .execute();
+
+        }
+        else if (id == R.id.nav_parent) {
+            AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(this);
+            alertDialogBuilder.setTitle("부모 설정")
+                    .setMessage("부모 : Yes, 아이 : No")
+                    .setCancelable(false)
+                    .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int id) {
+                            parent = true;
+                            Toast.makeText(getApplicationContext(), "부모로 설정하였습니다.", Toast.LENGTH_SHORT).show();
+                        }
+                    });
+            alertDialogBuilder.setNegativeButton("No", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int id) {
+                    parent = false;
+                    Toast.makeText(getApplicationContext(), "아이로 설정하였습니다.", Toast.LENGTH_SHORT).show();
+                }
+            });
+            AlertDialog alert = alertDialogBuilder.create();
+            alert.show();
+            mTimer.cancel();
+            mTimer = new Timer();
+        }
+        else if (id == R.id.nav_distance) {
+            final EditText et = new EditText(this);
+            et.setInputType(InputType.TYPE_CLASS_NUMBER);
+            AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(this);
+            alertDialogBuilder.setTitle("검색 반경 설정")
+                    .setMessage("값을 입력해주세요. (최대 : 50000)")
+                    .setView(et)
+                    .setCancelable(false)
+                    .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int id) {
+                            if (et.getText().length() == 0)
+                                Toast.makeText(getApplicationContext(), "값을 다시 입력해주세요.", Toast.LENGTH_SHORT).show();
+                            else {
+                                radius = et.getText().toString();
+                                Toast.makeText(getApplicationContext(), "반경 : "+radius+"m", Toast.LENGTH_SHORT).show();
+                            }
+                        }
+                    });
+            alertDialogBuilder.setNegativeButton("No", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int id) {
+                    dialog.dismiss();
+                }
+            });
+            AlertDialog alert = alertDialogBuilder.create();
+            alert.show();
+        }
+
+        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
+        drawer.closeDrawer(GravityCompat.START);
+        return true;
+    }
 
     public boolean checkLocationPermission(){
         Log.d(TAG, "checkLocationPermission");
@@ -331,10 +493,10 @@ public class MainActivity extends Activity implements OnMapReadyCallback,
                     return;
 
                 LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
-                MarkerOptions markerOptions = new MarkerOptions();
+                /*MarkerOptions markerOptions = new MarkerOptions();
                 markerOptions.position(latLng);
                 markerOptions.title("현재위치");
-                googleMap.addMarker(markerOptions);
+                googleMap.addMarker(markerOptions);*/
 
                 googleMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
                 googleMap.animateCamera(CameraUpdateFactory.zoomTo(15));
@@ -357,6 +519,8 @@ public class MainActivity extends Activity implements OnMapReadyCallback,
     protected void onStart(){
         super.onStart();
 
+        Log.i("zzzzzzzzzzzzzzzzzz", "onStart()");
+
         if (mGoogleApiClient != null)
             mGoogleApiClient.connect();
     }
@@ -364,9 +528,12 @@ public class MainActivity extends Activity implements OnMapReadyCallback,
 
     public void onResume(){
         super.onResume();
+        Log.i("zzzzzzzzzzzzzzzzzz", "onResume()");
 
         if (mGoogleApiClient != null)
             mGoogleApiClient.connect();
+
+        mTimer = new Timer();
     }
 
 
@@ -374,7 +541,10 @@ public class MainActivity extends Activity implements OnMapReadyCallback,
         if (mGoogleApiClient != null && mGoogleApiClient.isConnected()){
             mGoogleApiClient.disconnect();
         }
+        Log.i("zzzzzzzzzzzzzzzzzz", "onStop()");
         super.onStop();
+
+        mTimer.cancel();
     }
 
 
@@ -382,12 +552,13 @@ public class MainActivity extends Activity implements OnMapReadyCallback,
         if (mGoogleApiClient != null && mGoogleApiClient.isConnected()){
             mGoogleApiClient.disconnect();
         }
+        Log.i("zzzzzzzzzzzzzzzzzz", "onPause()");
         super.onPause();
     }
 
 
     protected void onDestroy(){
-        Log.d(TAG, "OnDestroy");
+        Log.i("zzzzzzzzzzzzzzzzzz", "onDestroy()");
 
         if (mGoogleApiClient != null){
             mGoogleApiClient.unregisterConnectionCallbacks(this);
@@ -400,91 +571,36 @@ public class MainActivity extends Activity implements OnMapReadyCallback,
             mGoogleApiClient = null;
         }
         super.onDestroy();
+
+        running = false;
     }
 
 
     public void onLocationChanged(final Location location){
+        Log.i("zzzzzzzzzzzzzzzz", "onLocationChanged()");
         String errorMessage = "";
-        currentPosition = new LatLng(location.getLatitude(), location.getLongitude());
+        //currentPosition = new LatLng(location.getLatitude(), location.getLongitude());
 
         if (current_marker != null)
             current_marker.remove();
 
         LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
-        MarkerOptions markerOptions = new MarkerOptions();
+        final MarkerOptions markerOptions = new MarkerOptions();
         markerOptions.position(latLng);
-        markerOptions.title("현재위치");
+        markerOptions.title("내 위치");
+        if(parent == true)
+            markerOptions.icon(BitmapDescriptorFactory.fromResource(R.drawable.parent));
+        else
+            markerOptions.icon(BitmapDescriptorFactory.fromResource(R.drawable.child));
         current_marker = googleMap.addMarker(markerOptions);
-
-        Button button2 = (Button)findViewById(R.id.Send);
-        Button button3 = (Button)findViewById(R.id.Receive);
 
         //latitude = location.getLatitude();
         //longitude = location.getLongitude();
 
-        button2.setOnClickListener(new View.OnClickListener(){
-            public void onClick(View view){
-                Map<String, Object> hopperUpdates = new HashMap<String, Object>();
-                hopperUpdates.put("position", new PosData(0, 0));
-                databaseReference.updateChildren(hopperUpdates);
-                hopperUpdates.put("position", new PosData(location.getLatitude(), location.getLongitude()));
-                databaseReference.updateChildren(hopperUpdates);
-                String st = Double.toString(location.getLatitude());
-                Toast.makeText(getApplicationContext(), "(" + st + ")위치를 전송하였습니다.", Toast.LENGTH_SHORT).show();
-            }
-        });
-
-        button3.setOnClickListener(new View.OnClickListener(){
-            public void onClick(View view){
-                databaseReference.child("position").addListenerForSingleValueEvent(
-                        new ValueEventListener() {
-                            @Override
-                            public void onDataChange(DataSnapshot dataSnapshot) {
-                                // Get user value
-                                PosData posData = dataSnapshot.getValue(PosData.class);  // chatData를 가져오고
-                                String st = Double.toString(posData.getLat());
-                                Toast.makeText(getApplicationContext(), "(" + st + ")위치를 받았습니다.", Toast.LENGTH_SHORT).show();
-
-                                // ...
-                            }
-
-                            @Override
-                            public void onCancelled(DatabaseError databaseError) {
-                                Log.w(TAG, "getUser:onCancelled", databaseError.toException());
-                                // ...
-                            }
-                        });
-            }
-        });
-
-        /*if (trace == true) {
-            Geocoder geocoder = new Geocoder(this, Locale.getDefault());
-            List<Address> addresses = null;
-
-            try{
-                addresses = geocoder.getFromLocation(
-                        location.getLatitude(),location.getLongitude(), 1);
-            }catch (IOException ioException){
-                errorMessage = "지오코더 서비스 사용불가";
-                Toast.makeText(this, errorMessage, Toast.LENGTH_SHORT).show();
-            }catch (IllegalArgumentException illegalArgumentException){
-                errorMessage = "잘못된 GPS 좌표";
-                Toast.makeText(this, errorMessage, Toast.LENGTH_SHORT).show();
-            }
-            googleMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
-            googleMap.animateCamera(CameraUpdateFactory.zoomTo(15));
-            googleMap.getUiSettings().setCompassEnabled(true);
-            if (addresses == null || addresses.size() == 0){
-                if (errorMessage.isEmpty()){
-                    errorMessage = "주소 미발견";
-                    Log.e(TAG, errorMessage);
-                }
-                Toast.makeText(this, errorMessage, Toast.LENGTH_SHORT).show();
-            }else{
-                Address address = addresses.get(0);
-                Toast.makeText(this, address.getAddressLine(0).toString() + ", " + Double.toString(latitude) + ", " + Double.toString(longitude), Toast.LENGTH_SHORT).show();
-            }
-        }*/
+        if(parent == false)
+            startTimerTask1(location.getLatitude(), location.getLongitude());
+        else
+            startTimerTask2();
     }
 
 
@@ -527,5 +643,96 @@ public class MainActivity extends Activity implements OnMapReadyCallback,
 
     public void onPlacesFinished(){
         Log.i("PlacesAPI", "onPlacesFinished()");
+    }
+
+
+    private void startTimerTask1(final double x, final double y) {
+        // 1. TimerTask 실행 중이라면 중단한다
+        stopTimerTask();
+
+        // 2. 새로운 TimerTask를 생성한다
+        // 2-1. 100 밀리초마다 카운팅 되는 태스크를 정의
+        mTimerTask = new TimerTask() {
+            @Override
+            public void run() {
+                Map<String, Object> hopperUpdates = new HashMap<String, Object>();
+                hopperUpdates.put("position", new PosData(x, y));
+                databaseReference.updateChildren(hopperUpdates);
+                String st = Double.toString(x);
+                Log.i("zzzzzzzzzzzzzzz", "(" + st + ")위치를 전송하였습니다.");
+                MainActivity.this.runOnUiThread(new Runnable() {
+                    public void run() {
+                        String st = Double.toString(x);
+                        if (child_marker != null)
+                            child_marker.remove();
+                        Toast.makeText(getApplicationContext(), "("+x+", "+y+") 위치를 전송하였습니다.", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        };
+
+        // 3. TimerTask를 Timer를 통해 실행시킨다
+        // 3-1. 즉시 타이머를 구동하고 100 밀리초 단위로 반복하라
+        mTimer.schedule(mTimerTask, 0, 1000 * second);
+    }
+
+    private void startTimerTask2() {
+        // 1. TimerTask 실행 중이라면 중단한다
+        stopTimerTask();
+
+        // 2. 새로운 TimerTask를 생성한다
+        // 2-1. 100 밀리초마다 카운팅 되는 태스크를 정의
+        mTimerTask = new TimerTask() {
+            @Override
+            public void run() {
+                databaseReference.child("position").addListenerForSingleValueEvent(
+                        new ValueEventListener() {
+                            @Override
+                            public void onDataChange(DataSnapshot dataSnapshot) {
+                                // Get user value
+                                MainActivity.PosData posData = dataSnapshot.getValue(MainActivity.PosData.class);
+                                latitude = posData.getLat();
+                                longitude = posData.getLon();
+                                //String st = Double.toString(posData.getLat());
+                            }
+
+                            @Override
+                            public void onCancelled(DatabaseError databaseError) {
+                                Log.w(TAG, "getUser:onCancelled", databaseError.toException());
+                                // ...
+                            }
+                        });
+
+                MainActivity.this.runOnUiThread(new Runnable() {
+                    public void run() {
+                        //Toast.makeText(getApplicationContext(), second + "위치를 전송하였습니다.", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getApplicationContext(), "("+latitude+", "+longitude+") 위치를 수신하였습니다.", Toast.LENGTH_SHORT).show();
+
+                        if (child_marker != null)
+                            child_marker.remove();
+
+                        LatLng latLng = new LatLng(latitude, longitude);
+                        final MarkerOptions markerOptions = new MarkerOptions();
+                        markerOptions.position(latLng);
+                        markerOptions.title("아이위치");
+                        markerOptions.icon(BitmapDescriptorFactory.fromResource(R.drawable.child));
+                        child_marker = googleMap.addMarker(markerOptions);
+                    }
+                });
+            }
+        };
+
+        // 3. TimerTask를 Timer를 통해 실행시킨다
+        // 3-1. 즉시 타이머를 구동하고 100 밀리초 단위로 반복하라
+        mTimer.schedule(mTimerTask, 0, 1000 * second);
+    }
+
+
+    private void stopTimerTask() {
+        // 1. 모든 태스크를 중단한다
+        if(mTimerTask != null) {
+            mTimerTask.cancel();
+            mTimerTask = null;
+        }
     }
 }
