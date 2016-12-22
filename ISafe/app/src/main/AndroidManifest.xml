@@ -9,7 +9,7 @@
 
     <application
         android:allowBackup="true"
-        android:icon="@mipmap/icon"
+        android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
@@ -20,20 +20,13 @@
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyAZzT0bh43JOzALX_GAXX_49u2B-JbbOkk"/>
 
-        <activity android:name=".SplashScreenActivity">
+        <activity android:name=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-
         </activity>
-        <activity android:name=".MainActivity">
-
-        </activity>
-
-        <service android:name=".SafeService"></service>
-
     </application>
 
 </manifest>
